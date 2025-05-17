@@ -1,0 +1,117 @@
+/**
+ * DashboardLayout Component Styles
+ */
+
+.ft-dashboard-layout {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-bg, #f9fafb);
+}
+
+/* Sidebar */
+.ft-dashboard-layout__sidebar {
+  height: 100%;
+  background-color: var(--color-bg-sidebar, #111827);
+  color: var(--color-text-light, #f9fafb);
+  overflow-y: auto;
+  flex-shrink: 0;
+  transition: width 0.3s ease;
+  position: relative;
+  z-index: 10;
+}
+
+/* Main content area */
+.ft-dashboard-layout__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Header */
+.ft-dashboard-layout__header {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 24px;
+  background-color: white;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.ft-dashboard-layout__sidebar-toggle {
+  margin-right: 16px;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--color-text-secondary, #6b7280);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.ft-dashboard-layout__sidebar-toggle:hover {
+  background-color: var(--color-bg-hover, #f3f4f6);
+  color: var(--color-text, #111827);
+}
+
+.ft-dashboard-layout__title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ft-dashboard-layout__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Main content */
+.ft-dashboard-layout__content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* Footer */
+.ft-dashboard-layout__footer {
+  padding: 16px 24px;
+  background-color: white;
+  border-top: 1px solid var(--color-border-light, #e5e7eb);
+  flex-shrink: 0;
+}
+
+/* Collapsed sidebar state */
+.ft-dashboard-layout--sidebar-collapsed .ft-dashboard-layout__sidebar {
+  overflow: visible;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ft-dashboard-layout__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+  }
+  
+  .ft-dashboard-layout--sidebar-collapsed .ft-dashboard-layout__sidebar {
+    transform: translateX(-100%);
+    width: 240px !important;
+  }
+  
+  .ft-dashboard-layout__header {
+    padding: 0 16px;
+  }
+  
+  .ft-dashboard-layout__content {
+    padding: 16px;
+  }
+}
