@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test IPC</title>
+</head>
+<body>
+    <h1>Testing IPC Communication</h1>
+    <div id="status">Checking electronAPI...</div>
+    <button id="testButton">Test focusSession.getAll()</button>
+    <div id="result"></div>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+        const testButton = document.getElementById('testButton');
+        
+        // Check if electronAPI is available
+        if (window.electronAPI) {
+            statusDiv.textContent = 'electronAPI is available! Methods: ' + Object.keys(window.electronAPI).join(', ');
+            statusDiv.style.color = 'green';
+            
+            if (window.electronAPI.focusSession) {
+                statusDiv.textContent += ' - focusSession available with: ' + Object.keys(window.electronAPI.focusSession).join(', ');
+            }
+        } else {
+            statusDiv.textContent = 'electronAPI is NOT available';
+            statusDiv.style.color = 'red';
+        }
+        
+        // Test button
+        testButton.addEventListener('click', async () => {
+            if (!window.electronAPI?.focusSession) {
+                resultDiv.textContent = 'focusSession API not available';
+                resultDiv.style.color = 'red';
+                return;
+            }
+            
+            try {
+                resultDiv.textContent = 'Calling focusSession.getAll()...';
+                const result = await window.electronAPI.focusSession.getAll();
+                resultDiv.textContent = 'Result: ' + JSON.stringify(result, null, 2);
+                resultDiv.style.color = 'green';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.style.color = 'red';
+            }
+        });
+    </script>
+</body>
+</html>
