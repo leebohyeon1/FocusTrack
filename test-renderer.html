@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Renderer</title>
+</head>
+<body>
+    <h1>Test Renderer</h1>
+    <div id="status"></div>
+    <script>
+        const statusDiv = document.getElementById('status');
+        
+        // Check if electronAPI exists
+        if (typeof window.electronAPI !== 'undefined') {
+            statusDiv.innerHTML = '<p style="color: green;">✓ electronAPI is available!</p>';
+            console.log('electronAPI:', window.electronAPI);
+            
+            // List available methods
+            const methods = Object.keys(window.electronAPI);
+            statusDiv.innerHTML += '<h3>Available methods:</h3><ul>';
+            methods.forEach(method => {
+                statusDiv.innerHTML += `<li>${method}</li>`;
+                console.log(`Method: ${method}`, window.electronAPI[method]);
+            });
+            statusDiv.innerHTML += '</ul>';
+        } else {
+            statusDiv.innerHTML = '<p style="color: red;">✗ electronAPI is NOT available!</p>';
+            console.error('electronAPI is undefined');
+            
+            // Check what's available on window
+            console.log('Window object keys:', Object.keys(window));
+        }
+        
+        // Additional debugging
+        console.log('window.electronAPI:', window.electronAPI);
+        console.log('typeof window.electronAPI:', typeof window.electronAPI);
+    </script>
+</body>
+</html>

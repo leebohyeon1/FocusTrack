@@ -301,6 +301,14 @@ class MainApplication extends EventEmitter {
     // Get saved window state
     const windowState = this.stateManager.getWindowState('main');
     
+    // Add debug logging
+    this.logger.info('Creating main window with state:', windowState);
+    
+    // Make sure webPreferences are properly passed
+    const path = require('path');
+    const preloadPath = path.join(__dirname, '../../preload/preload.js');
+    this.logger.info('Preload script path from MainApplication:', preloadPath);
+    
     // Create the window
     const mainWindow = this.windowManager.createWindow('main', {
       width: windowState.width || 1200,
@@ -310,7 +318,13 @@ class MainApplication extends EventEmitter {
       minWidth: 800,
       minHeight: 600,
       show: !this.stateManager.getSetting('startMinimized', false),
-      backgroundColor: '#FFFFFF'
+      backgroundColor: '#FFFFFF',
+      webPreferences: {
+        preload: preloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+        devTools: this.isDevelopment
+      }
     });
     
     // Apply saved state

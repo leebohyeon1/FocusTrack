@@ -28,11 +28,21 @@ function App() {
 
   // Load initial data
   useEffect(() => {
-    loadSessions();
-    loadSettings();
+    // Check if electronAPI is available
+    if (window.electronAPI) {
+      loadSessions();
+      loadSettings();
+    } else {
+      console.warn('Electron API not available. Running in web mode.');
+    }
   }, []);
 
   const loadSessions = async () => {
+    if (!window.electronAPI?.focusSession) {
+      console.warn('focusSession API not available');
+      return;
+    }
+    
     const result = await window.electronAPI.focusSession.getAll();
     if (result.success) {
       setFocusSessions(result.data || []);
@@ -40,6 +50,11 @@ function App() {
   };
 
   const loadSettings = async () => {
+    if (!window.electronAPI?.settings) {
+      console.warn('settings API not available');
+      return;
+    }
+    
     const sessionDurationResult = await window.electronAPI.settings.get('sessionDuration');
     const breakDurationResult = await window.electronAPI.settings.get('breakDuration');
     
@@ -52,6 +67,11 @@ function App() {
   };
 
   const startSession = async () => {
+    if (!window.electronAPI?.focusSession) {
+      console.warn('Cannot start session - API not available');
+      return;
+    }
+    
     const sessionData = {
       startTime: new Date().toISOString(),
       duration: 0,
@@ -69,6 +89,11 @@ function App() {
   };
 
   const stopSession = async () => {
+    if (!window.electronAPI?.focusSession) {
+      console.warn('Cannot stop session - API not available');
+      return;
+    }
+    
     if (currentSession) {
       const updates = {
         endTime: new Date().toISOString(),
