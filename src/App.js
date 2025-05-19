@@ -113,6 +113,11 @@ function App() {
   };
 
   const saveSettings = async () => {
+    if (!window.electronAPI?.settings) {
+      console.warn('Settings API not available');
+      return;
+    }
+    
     await window.electronAPI.settings.set('sessionDuration', settings.sessionDuration);
     await window.electronAPI.settings.set('breakDuration', settings.breakDuration);
   };
