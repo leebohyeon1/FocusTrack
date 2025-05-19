@@ -22,6 +22,12 @@ class EntityRepository extends EventEmitter {
     this.fileUtils = options.fileUtils;
     this.encryptionService = options.encryptionService;
     this.storagePath = options.storagePath;
+    
+    // Only set paths if storagePath is provided
+    if (this.storagePath) {
+      this.entitiesPath = path.join(this.storagePath, 'entities');
+    }
+    
     this.isInitialized = false;
   }
 
@@ -32,9 +38,13 @@ class EntityRepository extends EventEmitter {
    * @returns {Promise<boolean>} - True if initialization was successful
    */
   async initialize(options = {}) {
+    if (!this.storagePath) {
+      throw new Error('Storage path is required');
+    }
+    
     try {
       // Ensure storage paths exist
-      await this.fileUtils.ensureDir(this.storagePath);
+      await this.fileUtils.ensureDir(this.entitiesPath);
       
       this.isInitialized = true;
       this.emit('initialized');
@@ -64,7 +74,7 @@ class EntityRepository extends EventEmitter {
    * @returns {String} Full path to the entity type storage location
    */
   getEntityPath(entityType) {
-    return path.join(this.storagePath, entityType);
+    return path.join(this.entitiesPath, entityType);
   }
 
   /**
@@ -87,7 +97,23 @@ class EntityRepository extends EventEmitter {
    * @returns {Promise<Object>} Prepared entity data
    */
   async prepareEntityForStorage(entityType, data, options = {}) {
-    // Apply encryption if needed and available
+    // Apply field-level encryption if specified
+    if (options.encryptFields && this.encryptionService && this.encryptionService.enabled) {
+      const dataCopy = { ...data };
+      
+      for (const field of options.encryptFields) {
+        if (data[field] !== undefined) {
+          const encrypted = await this.encryptionService.encryptData({ data: data[field] });
+          dataCopy[field] = encrypted.data;
+          dataCopy[`${field}_iv`] = encrypted.iv;
+          dataCopy[`${field}_encrypted`] = true;
+        }
+      }
+      
+      return dataCopy;
+    }
+    
+    // Apply full entity encryption if needed
     if (options.encrypt && this.encryptionService && this.encryptionService.enabled) {
       const encryptedData = await this.encryptionService.encryptData(data);
       return {
@@ -187,13 +213,35 @@ class EntityRepository extends EventEmitter {
       // Read entity data
       const data = await this.fileUtils.readJsonFile(filePath);
       
-      // Decrypt if needed
-      if (data._encrypted && this.encryptionService && this.encryptionService.enabled) {
-        const decryptedData = await this.encryptionService.decryptData(data);
-        return decryptedData;
+      // Decrypt field-level encryption if present
+      const decryptedData = { ...data };
+      let hasFieldEncryption = false;
+      
+      for (const key in data) {
+        if (key.endsWith('_encrypted') && data[key] === true) {
+          const fieldName = key.replace('_encrypted', '');
+          if (data[fieldName] !== undefined && data[`${fieldName}_iv`] !== undefined) {
+            hasFieldEncryption = true;
+            if (this.encryptionService && this.encryptionService.enabled) {
+              const decrypted = await this.encryptionService.decryptData({
+                data: data[fieldName],
+                iv: data[`${fieldName}_iv`]
+              });
+              decryptedData[fieldName] = decrypted.data;
+              delete decryptedData[`${fieldName}_iv`];
+              delete decryptedData[`${fieldName}_encrypted`];
+            }
+          }
+        }
       }
       
-      return data;
+      // Decrypt full entity if needed
+      if (data._encrypted && this.encryptionService && this.encryptionService.enabled) {
+        const decrypted = await this.encryptionService.decryptData(data);
+        return decrypted;
+      }
+      
+      return decryptedData;
     } catch (error) {
       this.emit('error', { 
         operation: 'getEntity', 
@@ -272,7 +320,7 @@ class EntityRepository extends EventEmitter {
       const existingEntity = await this.getEntity(entityType, entityId);
       
       if (!existingEntity) {
-        throw new Error(`Entity not found: ${entityType}/${entityId}`);
+        return null;
       }
       
       // Merge data with existing entity

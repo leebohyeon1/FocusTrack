@@ -21,8 +21,13 @@ class SettingsRepository extends EventEmitter {
     this.fileUtils = options.fileUtils;
     this.encryptionService = options.encryptionService;
     this.storagePath = options.storagePath;
-    this.settingsPath = path.join(this.storagePath, 'settings');
-    this.settingsFile = path.join(this.settingsPath, 'settings.json');
+    
+    // Only set paths if storagePath is provided
+    if (this.storagePath) {
+      this.settingsPath = path.join(this.storagePath, 'settings');
+      this.settingsFile = path.join(this.settingsPath, 'settings.json');
+    }
+    
     this.isInitialized = false;
     this.settings = null;
   }
@@ -34,6 +39,10 @@ class SettingsRepository extends EventEmitter {
    * @returns {Promise<boolean>} - True if initialization was successful
    */
   async initialize(options = {}) {
+    if (!this.storagePath) {
+      throw new Error('Storage path is required');
+    }
+    
     try {
       // Ensure storage paths exist
       await this.fileUtils.ensureDir(this.settingsPath);
@@ -201,8 +210,12 @@ class SettingsRepository extends EventEmitter {
       
       // Find existing setting
       const existingIndex = this.settings.findIndex(s => s.key === key);
+      let oldValue = undefined;
       
       if (existingIndex >= 0) {
+        // Store old value before updating
+        oldValue = this.settings[existingIndex].value;
+        
         // Update existing setting
         this.settings[existingIndex] = {
           ...this.settings[existingIndex],
@@ -227,7 +240,11 @@ class SettingsRepository extends EventEmitter {
       await this.saveSettings();
       
       // Emit event
-      this.emit('settingChanged', { key, value });
+      const eventData = { key, value };
+      if (oldValue !== undefined) {
+        eventData.oldValue = oldValue;
+      }
+      this.emit('settingChanged', eventData);
       
       return true;
     } catch (error) {

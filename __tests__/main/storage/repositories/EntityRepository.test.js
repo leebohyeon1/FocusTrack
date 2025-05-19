@@ -19,9 +19,9 @@ describe('EntityRepository', () => {
       ensureDir: jest.fn().mockResolvedValue(true),
       readJsonFile: jest.fn().mockResolvedValue({}),
       writeJsonFile: jest.fn().mockResolvedValue(true),
-      exists: jest.fn().mockResolvedValue(true),
-      readdir: jest.fn().mockResolvedValue([]),
-      unlink: jest.fn().mockResolvedValue(true)
+      fileExists: jest.fn().mockResolvedValue(true),
+      readDir: jest.fn().mockResolvedValue([]),
+      deleteFile: jest.fn().mockResolvedValue(true)
     };
     
     mockEncryptionService = {
@@ -32,11 +32,12 @@ describe('EntityRepository', () => {
         Promise.resolve({ data: data.replace('encrypted_', '') }))
     };
     
-    FileUtils.mockImplementation(() => mockFileUtils);
+    FileUtils.mockReturnValue(mockFileUtils);
     
     entityRepository = new EntityRepository({
       storagePath: testStoragePath,
-      encryptionService: mockEncryptionService
+      encryptionService: mockEncryptionService,
+      fileUtils: mockFileUtils
     });
     
     // Initialize the repository
@@ -141,7 +142,7 @@ describe('EntityRepository', () => {
         name: 'Test Task',
         secretData: 'encrypted_confidential',
         secretData_iv: 'test-iv',
-        _encryptedFields: ['secretData']
+        secretData_encrypted: true
       };
       
       mockFileUtils.readJsonFile.mockResolvedValueOnce(mockEntity);
@@ -157,7 +158,7 @@ describe('EntityRepository', () => {
     });
     
     it('should return null if entity does not exist', async () => {
-      mockFileUtils.exists.mockResolvedValueOnce(false);
+      mockFileUtils.fileExists.mockResolvedValueOnce(false);
       
       const entity = await entityRepository.getEntity('tasks', 'non-existent');
       
@@ -201,7 +202,7 @@ describe('EntityRepository', () => {
     });
     
     it('should return null if entity to update does not exist', async () => {
-      mockFileUtils.exists.mockResolvedValueOnce(false);
+      mockFileUtils.fileExists.mockResolvedValueOnce(false);
       
       const result = await entityRepository.updateEntity('tasks', 'non-existent', {});
       
@@ -214,31 +215,31 @@ describe('EntityRepository', () => {
     it('should delete an entity successfully', async () => {
       const entityType = 'tasks';
       const entityId = 'test-123';
-      mockFileUtils.exists.mockResolvedValueOnce(true);
+      mockFileUtils.fileExists.mockResolvedValueOnce(true);
       
       const result = await entityRepository.deleteEntity(entityType, entityId);
       
       expect(result).toBe(true);
-      expect(mockFileUtils.unlink).toHaveBeenCalledWith(
+      expect(mockFileUtils.deleteFile).toHaveBeenCalledWith(
         path.join(testStoragePath, 'entities', entityType, `${entityId}.json`)
       );
     });
     
     it('should return false if entity to delete does not exist', async () => {
-      mockFileUtils.exists.mockResolvedValueOnce(false);
+      mockFileUtils.fileExists.mockResolvedValueOnce(false);
       
       const result = await entityRepository.deleteEntity('tasks', 'non-existent');
       
       expect(result).toBe(false);
-      expect(mockFileUtils.unlink).not.toHaveBeenCalled();
+      expect(mockFileUtils.deleteFile).not.toHaveBeenCalled();
     });
   });
   
-  describe('listEntities', () => {
-    it('should list all entities of a specified type', async () => {
+  describe('getAllEntities', () => {
+    it('should get all entities of a specified type', async () => {
       const entityType = 'tasks';
       
-      mockFileUtils.readdir.mockResolvedValueOnce([
+      mockFileUtils.readDir.mockResolvedValueOnce([
         'task-1.json', 'task-2.json', 'task-3.json'
       ]);
       
@@ -254,22 +255,24 @@ describe('EntityRepository', () => {
         .mockResolvedValueOnce(entities[1])
         .mockResolvedValueOnce(entities[2]);
       
-      const result = await entityRepository.listEntities(entityType);
+      const result = await entityRepository.getAllEntities(entityType);
       
       expect(result).toEqual(entities);
-      expect(mockFileUtils.readdir).toHaveBeenCalledWith(
+      expect(mockFileUtils.readDir).toHaveBeenCalledWith(
         path.join(testStoragePath, 'entities', entityType)
       );
       expect(mockFileUtils.readJsonFile).toHaveBeenCalledTimes(3);
     });
     
     it('should return an empty array if entity type directory does not exist', async () => {
-      mockFileUtils.exists.mockResolvedValueOnce(false);
+      mockFileUtils.readDir.mockResolvedValueOnce([]);
       
-      const result = await entityRepository.listEntities('non-existent-type');
+      const result = await entityRepository.getAllEntities('non-existent-type');
       
       expect(result).toEqual([]);
-      expect(mockFileUtils.readdir).not.toHaveBeenCalled();
+      expect(mockFileUtils.readDir).toHaveBeenCalledWith(
+        path.join(testStoragePath, 'entities', 'non-existent-type')
+      );
     });
   });
   
@@ -293,7 +296,7 @@ describe('EntityRepository', () => {
       entityRepository.on('entityUpdated', eventSpy);
       
       const mockEntity = { id: 'test-123', name: 'Original Name' };
-      mockFileUtils.exists.mockResolvedValueOnce(true);
+      mockFileUtils.fileExists.mockResolvedValueOnce(true);
       mockFileUtils.readJsonFile.mockResolvedValueOnce(mockEntity);
       
       await entityRepository.updateEntity('tasks', 'test-123', { name: 'Updated Name' });
@@ -310,7 +313,7 @@ describe('EntityRepository', () => {
       const eventSpy = jest.fn();
       entityRepository.on('entityDeleted', eventSpy);
       
-      mockFileUtils.exists.mockResolvedValueOnce(true);
+      mockFileUtils.fileExists.mockResolvedValueOnce(true);
       
       await entityRepository.deleteEntity('tasks', 'test-123');
       

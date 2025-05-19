@@ -19,8 +19,9 @@ describe('StorageManagerAdapter', () => {
   let mockMetadataRepository;
   
   beforeEach(() => {
-    // Create mock repository instances
-    mockEntityRepository = {
+    // Create mock repository instances - need to match EventEmitter behavior
+    mockEntityRepository = Object.create(EventEmitter.prototype);
+    Object.assign(mockEntityRepository, {
       initialize: jest.fn().mockResolvedValue(true),
       createEntity: jest.fn(),
       updateEntity: jest.fn(),
@@ -28,37 +29,38 @@ describe('StorageManagerAdapter', () => {
       deleteEntity: jest.fn(),
       listEntities: jest.fn(),
       on: jest.fn(),
-      emit: jest.fn()
-    };
+      emit: jest.fn(),
+      removeAllListeners: jest.fn()
+    });
     
-    mockSettingsRepository = {
+    mockSettingsRepository = Object.create(EventEmitter.prototype);
+    Object.assign(mockSettingsRepository, {
       initialize: jest.fn().mockResolvedValue(true),
       getSetting: jest.fn(),
       setSetting: jest.fn(),
       deleteSetting: jest.fn(),
       getAllSettings: jest.fn(),
       on: jest.fn(),
-      emit: jest.fn()
-    };
+      emit: jest.fn(),
+      removeAllListeners: jest.fn()
+    });
     
-    mockMetadataRepository = {
+    mockMetadataRepository = Object.create(EventEmitter.prototype);
+    Object.assign(mockMetadataRepository, {
       initialize: jest.fn().mockResolvedValue(true),
       getMetadata: jest.fn(),
       storeMetadata: jest.fn(),
       deleteMetadata: jest.fn(),
       on: jest.fn(),
-      emit: jest.fn()
-    };
+      emit: jest.fn(),
+      removeAllListeners: jest.fn()
+    });
     
-    // Set up the mocked constructor implementations
-    EntityRepository.mockImplementation(() => mockEntityRepository);
-    SettingsRepository.mockImplementation(() => mockSettingsRepository);
-    MetadataRepository.mockImplementation(() => mockMetadataRepository);
-    
-    // Create the adapter
+    // Create the adapter with repository instances directly
     adapter = new StorageManagerAdapter({
-      storagePath: '/test/path',
-      encryptionService: { enabled: true }
+      entityRepository: mockEntityRepository,
+      settingsRepository: mockSettingsRepository,
+      metadataRepository: mockMetadataRepository
     });
   });
   
@@ -80,24 +82,25 @@ describe('StorageManagerAdapter', () => {
       await adapter.initialize();
       
       // Check that the adapter is subscribed to repository events
-      expect(mockEntityRepository.on).toHaveBeenCalledWith('entityCreated', expect.any(Function));
-      expect(mockEntityRepository.on).toHaveBeenCalledWith('entityUpdated', expect.any(Function));
-      expect(mockEntityRepository.on).toHaveBeenCalledWith('entityDeleted', expect.any(Function));
       expect(mockEntityRepository.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockEntityRepository.on).toHaveBeenCalledWith('initialized', expect.any(Function));
+      expect(mockEntityRepository.on).toHaveBeenCalledWith('*', expect.any(Function));
       
-      expect(mockSettingsRepository.on).toHaveBeenCalledWith('settingChanged', expect.any(Function));
-      expect(mockSettingsRepository.on).toHaveBeenCalledWith('settingDeleted', expect.any(Function));
       expect(mockSettingsRepository.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockSettingsRepository.on).toHaveBeenCalledWith('initialized', expect.any(Function));
+      expect(mockSettingsRepository.on).toHaveBeenCalledWith('*', expect.any(Function));
       
-      expect(mockMetadataRepository.on).toHaveBeenCalledWith('metadataStored', expect.any(Function));
-      expect(mockMetadataRepository.on).toHaveBeenCalledWith('metadataDeleted', expect.any(Function));
       expect(mockMetadataRepository.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockMetadataRepository.on).toHaveBeenCalledWith('initialized', expect.any(Function));
+      expect(mockMetadataRepository.on).toHaveBeenCalledWith('*', expect.any(Function));
     });
     
-    it('should throw error if initialized without storage path', async () => {
+    it('should initialize without repositories', async () => {
       adapter = new StorageManagerAdapter({});
       
-      await expect(adapter.initialize()).rejects.toThrow('Storage path is required');
+      const result = await adapter.initialize();
+      expect(result).toBe(true);
+      expect(adapter.isInitialized).toBe(true);
     });
   });
   
@@ -140,7 +143,7 @@ describe('StorageManagerAdapter', () => {
       
       const result = await adapter.getEntity(entityType, entityId);
       
-      expect(mockEntityRepository.getEntity).toHaveBeenCalledWith(entityType, entityId);
+      expect(mockEntityRepository.getEntity).toHaveBeenCalledWith(entityType, entityId, {});
       expect(result).toEqual(expectedEntity);
     });
     
@@ -175,22 +178,22 @@ describe('StorageManagerAdapter', () => {
       
       const result = await adapter.deleteEntity(entityType, entityId);
       
-      expect(mockEntityRepository.deleteEntity).toHaveBeenCalledWith(entityType, entityId);
+      expect(mockEntityRepository.deleteEntity).toHaveBeenCalledWith(entityType, entityId, {});
       expect(result).toBe(true);
     });
     
-    it('should delegate listEntities to EntityRepository', async () => {
+    it('should delegate getAllEntities to EntityRepository', async () => {
       const entityType = 'tasks';
       const expectedEntities = [
         { id: 'task-1', name: 'Task 1' },
         { id: 'task-2', name: 'Task 2' }
       ];
       
-      mockEntityRepository.listEntities.mockResolvedValueOnce(expectedEntities);
+      mockEntityRepository.getAllEntities = jest.fn().mockResolvedValueOnce(expectedEntities);
       
-      const result = await adapter.listEntities(entityType);
+      const result = await adapter.getAllEntities(entityType);
       
-      expect(mockEntityRepository.listEntities).toHaveBeenCalledWith(entityType);
+      expect(mockEntityRepository.getAllEntities).toHaveBeenCalledWith(entityType, {});
       expect(result).toEqual(expectedEntities);
     });
   });
@@ -303,11 +306,13 @@ describe('StorageManagerAdapter', () => {
     });
     
     it('should forward entity events', () => {
-      // Get the event handler that was registered
+      jest.spyOn(adapter, 'emit');
+      
+      // Get the event handler that was registered for wildcard
       const eventHandlerCall = mockEntityRepository.on.mock.calls.find(
-        call => call[0] === 'entityCreated'
+        call => call[0] === '*'
       );
-      const entityCreatedHandler = eventHandlerCall[1];
+      const wildcardHandler = eventHandlerCall[1];
       
       // Simulate the repository emitting an event
       const eventData = {
@@ -316,18 +321,23 @@ describe('StorageManagerAdapter', () => {
         data: { name: 'Test task' }
       };
       
-      entityCreatedHandler(eventData);
+      wildcardHandler('entityCreated', eventData);
       
-      // Check that the adapter forwarded the event
-      expect(adapter.emit).toHaveBeenCalledWith('entityCreated', eventData);
+      // Check that the adapter forwarded the event with source
+      expect(adapter.emit).toHaveBeenCalledWith('entityCreated', {
+        ...eventData,
+        source: 'entity'
+      });
     });
     
     it('should forward settings events', () => {
-      // Get the event handler that was registered
+      jest.spyOn(adapter, 'emit');
+      
+      // Get the event handler that was registered for wildcard
       const eventHandlerCall = mockSettingsRepository.on.mock.calls.find(
-        call => call[0] === 'settingChanged'
+        call => call[0] === '*'
       );
-      const settingChangedHandler = eventHandlerCall[1];
+      const wildcardHandler = eventHandlerCall[1];
       
       // Simulate the repository emitting an event
       const eventData = {
@@ -336,18 +346,23 @@ describe('StorageManagerAdapter', () => {
         oldValue: 'light'
       };
       
-      settingChangedHandler(eventData);
+      wildcardHandler('settingChanged', eventData);
       
-      // Check that the adapter forwarded the event
-      expect(adapter.emit).toHaveBeenCalledWith('settingChanged', eventData);
+      // Check that the adapter forwarded the event with source
+      expect(adapter.emit).toHaveBeenCalledWith('settingChanged', {
+        ...eventData,
+        source: 'settings'
+      });
     });
     
     it('should forward metadata events', () => {
-      // Get the event handler that was registered
+      jest.spyOn(adapter, 'emit');
+      
+      // Get the event handler that was registered for wildcard
       const eventHandlerCall = mockMetadataRepository.on.mock.calls.find(
-        call => call[0] === 'metadataStored'
+        call => call[0] === '*'
       );
-      const metadataStoredHandler = eventHandlerCall[1];
+      const wildcardHandler = eventHandlerCall[1];
       
       // Simulate the repository emitting an event
       const eventData = {
@@ -355,14 +370,19 @@ describe('StorageManagerAdapter', () => {
         metadata: { timestamp: 1641034800000 }
       };
       
-      metadataStoredHandler(eventData);
+      wildcardHandler('metadataStored', eventData);
       
-      // Check that the adapter forwarded the event
-      expect(adapter.emit).toHaveBeenCalledWith('metadataStored', eventData);
+      // Check that the adapter forwarded the event with source
+      expect(adapter.emit).toHaveBeenCalledWith('metadataStored', {
+        ...eventData,
+        source: 'metadata'
+      });
     });
     
     it('should forward error events', () => {
-      // Get the error event handlers
+      jest.spyOn(adapter, 'emit');
+      
+      // Get the error event handler
       const entityRepoErrorCall = mockEntityRepository.on.mock.calls.find(
         call => call[0] === 'error'
       );

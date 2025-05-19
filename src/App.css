@@ -1,0 +1,148 @@
+.App {
+  text-align: center;
+  background-color: #f0f2f5;
+  min-height: 100vh;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+.App-main {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.timer-section {
+  background: white;
+  border-radius: 10px;
+  padding: 30px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timer-display {
+  font-size: 64px;
+  font-weight: bold;
+  color: #282c34;
+  margin-bottom: 20px;
+}
+
+.timer-controls {
+  margin-top: 20px;
+}
+
+.btn {
+  padding: 12px 24px;
+  font-size: 18px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: #61dafb;
+  color: #282c34;
+}
+
+.btn-primary:hover {
+  background-color: #4fa8cb;
+}
+
+.btn-danger {
+  background-color: #ff6b6b;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #ff5252;
+}
+
+.sessions-section, .settings-section {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sessions-list {
+  margin-top: 15px;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.session-item:last-child {
+  border-bottom: none;
+}
+
+.session-time {
+  font-size: 14px;
+  color: #666;
+}
+
+.session-duration {
+  font-weight: bold;
+  color: #282c34;
+}
+
+.session-completed {
+  color: #4caf50;
+  font-size: 20px;
+}
+
+.setting-item {
+  margin: 15px 0;
+}
+
+.setting-item label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  color: #333;
+}
+
+.setting-item input {
+  width: 80px;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  text-align: center;
+}
+
+h1, h2 {
+  margin: 0;
+}
+
+h2 {
+  color: #282c34;
+  font-size: 22px;
+  margin-bottom: 15px;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  .timer-display {
+    font-size: 48px;
+  }
+  
+  .App-main {
+    padding: 10px;
+  }
+  
+  .timer-section {
+    padding: 20px;
+  }
+}

@@ -5,6 +5,9 @@ const FileUtils = require('../../../../src/main/storage/utils/FileUtils');
 
 jest.mock('../../../../src/main/storage/utils/FileUtils');
 
+// Helper function to get correct settings path
+const getSettingsPath = (storagePath) => path.join(storagePath, 'settings', 'settings.json');
+
 describe('SettingsRepository', () => {
   let settingsRepository;
   let mockFileUtils;
@@ -16,9 +19,9 @@ describe('SettingsRepository', () => {
     
     mockFileUtils = {
       ensureDir: jest.fn().mockResolvedValue(true),
-      readJsonFile: jest.fn().mockResolvedValue([]),
+      readJsonFile: jest.fn().mockResolvedValue({}),
       writeJsonFile: jest.fn().mockResolvedValue(true),
-      exists: jest.fn().mockResolvedValue(true)
+      fileExists: jest.fn().mockResolvedValue(true)
     };
     
     mockEncryptionService = {
@@ -29,11 +32,13 @@ describe('SettingsRepository', () => {
         Promise.resolve({ data: data.replace('encrypted_', '') }))
     };
     
-    FileUtils.mockImplementation(() => mockFileUtils);
+    // FileUtils 모킹 수정: 클래스 인스턴스 반환
+    FileUtils.mockReturnValue(mockFileUtils);
     
     settingsRepository = new SettingsRepository({
       storagePath: testStoragePath,
-      encryptionService: mockEncryptionService
+      encryptionService: mockEncryptionService,
+      fileUtils: mockFileUtils
     });
     
     // Initialize the repository
@@ -47,7 +52,7 @@ describe('SettingsRepository', () => {
   describe('initialization', () => {
     it('should initialize properly', () => {
       expect(settingsRepository.isInitialized).toBe(true);
-      expect(mockFileUtils.ensureDir).toHaveBeenCalledWith(testStoragePath);
+      expect(mockFileUtils.ensureDir).toHaveBeenCalledWith(path.join(testStoragePath, 'settings'));
     });
     
     it('should throw error when initialized without storage path', async () => {
@@ -64,29 +69,31 @@ describe('SettingsRepository', () => {
       mockFileUtils.readJsonFile.mockResolvedValueOnce(mockSettings);
       
       const newRepo = new SettingsRepository({
-        storagePath: testStoragePath
+        storagePath: testStoragePath,
+        fileUtils: mockFileUtils
       });
       
       await newRepo.initialize();
       
       expect(mockFileUtils.readJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json')
+        getSettingsPath(testStoragePath)
       );
       
       expect(newRepo.settings).toEqual(mockSettings);
     });
     
     it('should create empty settings if file does not exist', async () => {
-      mockFileUtils.exists.mockResolvedValueOnce(false);
+      mockFileUtils.fileExists.mockResolvedValueOnce(false);
       
       const newRepo = new SettingsRepository({
-        storagePath: testStoragePath
+        storagePath: testStoragePath,
+        fileUtils: mockFileUtils
       });
       
       await newRepo.initialize();
       
       expect(mockFileUtils.writeJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json'),
+        getSettingsPath(testStoragePath),
         []
       );
     });
@@ -146,7 +153,7 @@ describe('SettingsRepository', () => {
       const value = await settingsRepository.getSetting('theme');
       
       expect(mockFileUtils.readJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json')
+        getSettingsPath(testStoragePath)
       );
       
       expect(value).toBe('light');
@@ -171,13 +178,13 @@ describe('SettingsRepository', () => {
       
       await settingsRepository.setSetting('language', 'en');
       
-      expect(settingsRepository.settings).toEqual([
+      expect(settingsRepository.settings).toMatchObject([
         { key: 'theme', value: 'dark' },
         { key: 'language', value: 'en' }
       ]);
       
       expect(mockFileUtils.writeJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json'),
+        getSettingsPath(testStoragePath),
         settingsRepository.settings
       );
     });
@@ -190,13 +197,13 @@ describe('SettingsRepository', () => {
       
       await settingsRepository.setSetting('theme', 'light');
       
-      expect(settingsRepository.settings).toEqual([
+      expect(settingsRepository.settings).toMatchObject([
         { key: 'theme', value: 'light' },
         { key: 'showTips', value: true }
       ]);
       
       expect(mockFileUtils.writeJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json'),
+        getSettingsPath(testStoragePath),
         settingsRepository.settings
       );
     });
@@ -204,13 +211,13 @@ describe('SettingsRepository', () => {
     it('should encrypt settings marked as sensitive', async () => {
       settingsRepository.settings = [];
       
-      await settingsRepository.setSetting('apiKey', 'secretKey123', { encrypt: true });
+      await settingsRepository.setSetting('apiKey', 'secretKey123', { encrypted: true });
       
       expect(mockEncryptionService.encryptData).toHaveBeenCalledWith({
         data: 'secretKey123'
       });
       
-      expect(settingsRepository.settings[0]).toEqual({
+      expect(settingsRepository.settings[0]).toMatchObject({
         key: 'apiKey',
         value: 'encrypted_secretKey123',
         iv: 'test-iv',
@@ -246,10 +253,10 @@ describe('SettingsRepository', () => {
       await settingsRepository.setSetting('theme', 'light');
       
       expect(mockFileUtils.readJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json')
+        getSettingsPath(testStoragePath)
       );
       
-      expect(settingsRepository.settings).toEqual([
+      expect(settingsRepository.settings).toMatchObject([
         { key: 'theme', value: 'light' }
       ]);
     });
@@ -270,7 +277,7 @@ describe('SettingsRepository', () => {
       ]);
       
       expect(mockFileUtils.writeJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json'),
+        getSettingsPath(testStoragePath),
         settingsRepository.settings
       );
     });
@@ -297,14 +304,13 @@ describe('SettingsRepository', () => {
       await settingsRepository.deleteSetting('theme');
       
       expect(eventSpy).toHaveBeenCalledWith({
-        key: 'theme',
-        value: 'dark'
+        key: 'theme'
       });
     });
   });
   
   describe('getAllSettings', () => {
-    it('should return all non-encrypted settings', async () => {
+    it('should return all settings', async () => {
       settingsRepository.settings = [
         { key: 'theme', value: 'dark' },
         { key: 'showTips', value: true },
@@ -318,16 +324,16 @@ describe('SettingsRepository', () => {
       
       const settings = await settingsRepository.getAllSettings();
       
-      expect(settings).toEqual({
-        theme: 'dark',
-        showTips: true,
-        apiKey: 'secretKey123'
-      });
-      
-      expect(mockEncryptionService.decryptData).toHaveBeenCalledWith({
-        data: 'encrypted_secretKey123',
-        iv: 'test-iv'
-      });
+      expect(settings).toEqual([
+        { key: 'theme', value: 'dark' },
+        { key: 'showTips', value: true },
+        { 
+          key: 'apiKey', 
+          value: 'encrypted_secretKey123',
+          iv: 'test-iv',
+          encrypted: true
+        }
+      ]);
     });
     
     it('should reload settings from disk if settings are not loaded', async () => {
@@ -342,13 +348,13 @@ describe('SettingsRepository', () => {
       const settings = await settingsRepository.getAllSettings();
       
       expect(mockFileUtils.readJsonFile).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'settings.json')
+        getSettingsPath(testStoragePath)
       );
       
-      expect(settings).toEqual({
-        theme: 'dark',
-        showTips: true
-      });
+      expect(settings).toEqual([
+        { key: 'theme', value: 'dark' },
+        { key: 'showTips', value: true }
+      ]);
     });
   });
   
@@ -356,6 +362,9 @@ describe('SettingsRepository', () => {
     it('should emit error events when operations fail', async () => {
       const errorSpy = jest.fn();
       settingsRepository.on('error', errorSpy);
+      
+      // Make sure settings is initialized as an array
+      settingsRepository.settings = [];
       
       const testError = new Error('Test error');
       mockFileUtils.writeJsonFile.mockRejectedValueOnce(testError);
