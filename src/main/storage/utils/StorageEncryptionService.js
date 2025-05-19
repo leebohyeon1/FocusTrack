@@ -28,6 +28,13 @@ class StorageEncryptionService extends EventEmitter {
   }
 
   /**
+   * Set encryption enabled/disabled state
+   */
+  setEnabled(enabled) {
+    this.enabled = enabled;
+  }
+
+  /**
    * Derive encryption key from password
    */
   async deriveKey(password, salt) {
