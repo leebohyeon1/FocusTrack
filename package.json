@@ -12,6 +12,7 @@
   "scripts": {
     "start": "electron .",
     "start:simple": "cross-env NODE_ENV=development electron src/main/main-electron-simple.js",
+    "start:simple:win": "set NODE_ENV=development && electron src/main/main-electron-simple.js",
     "dev": "concurrently \"npm run react-dev\" \"npm run electron-dev\"",
     "react-dev": "cross-env BROWSER=none react-scripts start",
     "electron-dev": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
