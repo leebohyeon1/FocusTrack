@@ -35,6 +35,30 @@ class StorageEncryptionService extends EventEmitter {
   }
 
   /**
+   * Register encrypted fields for an entity type
+   * @param {string} entityType - The entity type
+   * @param {string[]} fields - Array of field names to encrypt
+   */
+  registerEncryptedFields(entityType, fields) {
+    if (!this.encryptedFields) {
+      this.encryptedFields = new Map();
+    }
+    this.encryptedFields.set(entityType, fields);
+  }
+
+  /**
+   * Get encrypted fields for an entity type
+   * @param {string} entityType - The entity type
+   * @returns {string[]} Array of field names that should be encrypted
+   */
+  getEncryptedFields(entityType) {
+    if (!this.encryptedFields) {
+      return [];
+    }
+    return this.encryptedFields.get(entityType) || [];
+  }
+
+  /**
    * Derive encryption key from password
    */
   async deriveKey(password, salt) {
