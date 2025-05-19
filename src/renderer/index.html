@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusTrack</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .timer {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #2196F3;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        
+        .sessions {
+            margin-top: 40px;
+        }
+        
+        .session-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .debug {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FocusTrack</h1>
+        
+        <div class="timer">
+            <div class="timer-display" id="timer">00:00</div>
+            <div class="controls">
+                <button id="startBtn" class="btn-primary">Start Session</button>
+                <button id="stopBtn" class="btn-danger" style="display:none;">Stop Session</button>
+            </div>
+        </div>
+        
+        <div class="sessions">
+            <h2>Recent Sessions</h2>
+            <div id="sessionsList"></div>
+        </div>
+        
+        <div class="debug">
+            <h3>Debug Info</h3>
+            <div id="debugInfo">Waiting for Electron API...</div>
+        </div>
+    </div>
+    
+    <script>
+        // Check if Electron API is available
+        if (window.electronAPI) {
+            document.getElementById('debugInfo').textContent = 'Electron API loaded successfully';
+            
+            let timer = 0;
+            let currentSession = null;
+            let isRunning = false;
+            let timerInterval = null;
+            
+            const timerDisplay = document.getElementById('timer');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const sessionsList = document.getElementById('sessionsList');
+            
+            // Update timer display
+            function updateTimerDisplay() {
+                const minutes = Math.floor(timer / 60);
+                const seconds = timer % 60;
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // Start session
+            startBtn.addEventListener('click', async () => {
+                const sessionData = {
+                    startTime: new Date().toISOString(),
+                    duration: 0,
+                    completed: false
+                };
+                
+                const result = await window.electronAPI.focusSession.create(sessionData);
+                
+                if (result.success) {
+                    currentSession = result.data;
+                    isRunning = true;
+                    timer = 0;
+                    
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                    
+                    timerInterval = setInterval(() => {
+                        timer++;
+                        updateTimerDisplay();
+                    }, 1000);
+                    
+                    document.getElementById('debugInfo').textContent = `Session started: ${currentSession.id}`;
+                } else {
+                    document.getElementById('debugInfo').textContent = `Error: ${result.error}`;
+                }
+            });
+            
+            // Stop session
+            stopBtn.addEventListener('click', async () => {
+                if (currentSession) {
+                    const updates = {
+                        endTime: new Date().toISOString(),
+                        duration: timer,
+                        completed: true
+                    };
+                    
+                    const result = await window.electronAPI.focusSession.update(currentSession.id, updates);
+                    
+                    if (result.success) {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        timer = 0;
+                        currentSession = null;
+                        
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                        
+                        updateTimerDisplay();
+                        loadSessions();
+                        
+                        document.getElementById('debugInfo').textContent = 'Session stopped';
+                    } else {
+                        document.getElementById('debugInfo').textContent = `Error: ${result.error}`;
+                    }
+                }
+            });
+            
+            // Load sessions
+            async function loadSessions() {
+                const result = await window.electronAPI.focusSession.getAll();
+                
+                if (result.success) {
+                    const sessions = result.data || [];
+                    sessionsList.innerHTML = '';
+                    
+                    if (sessions.length === 0) {
+                        sessionsList.innerHTML = '<p>No sessions yet</p>';
+                    } else {
+                        sessions.forEach(session => {
+                            const item = document.createElement('div');
+                            item.className = 'session-item';
+                            
+                            const time = new Date(session.startTime).toLocaleString();
+                            const duration = Math.round(session.duration / 60);
+                            
+                            item.innerHTML = `
+                                <span>${time}</span>
+                                <span>${duration} minutes</span>
+                            `;
+                            
+                            sessionsList.appendChild(item);
+                        });
+                    }
+                    
+                    document.getElementById('debugInfo').textContent = `Loaded ${sessions.length} sessions`;
+                } else {
+                    document.getElementById('debugInfo').textContent = `Error loading sessions: ${result.error}`;
+                }
+            }
+            
+            // Initial load
+            loadSessions();
+            
+        } else {
+            document.getElementById('debugInfo').textContent = 'Electron API not available';
+        }
+    </script>
+</body>
+</html>
