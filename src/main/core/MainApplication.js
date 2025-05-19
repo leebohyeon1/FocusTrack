@@ -22,12 +22,11 @@ const {
   UpdateManager,
   IpcManager,
   BackupManager,
-  StorageManager
+  StorageManager,
+  PermissionManager
 } = require('../managers');
 
 const PlatformManager = require('../platform');
-
-const { PermissionManager } = require('../managers/permission');
 
 class MainApplication extends EventEmitter {
   /**
@@ -369,12 +368,12 @@ class MainApplication extends EventEmitter {
    * Perform clean shutdown
    * @private
    */
-  performCleanShutdown() {
+  async performCleanShutdown() {
     this.isQuitting = true;
     
     // Save state
     if (this.stateManager) {
-      this.stateManager.saveState().catch(error => {
+      await this.stateManager.saveState().catch(error => {
         this.logger.error('Failed to save state during shutdown:', error);
       });
     }
